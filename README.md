@@ -1,258 +1,272 @@
+[![Java CI](https://github.com/akshitap30/ExpenseTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/akshitap30/ExpenseTracker/actions/workflows/ci.yml)
+
 # ExpenseTracker
 
-A production-style RESTful expense management API built with Spring Boot, Spring Security, and JWT authentication.
+A RESTful expense management API built with Spring Boot, Spring Security, and JWT authentication.
 
-ExpenseTracker enables authenticated users to manage personal expenses end-to-end — creating, searching, filtering, and paginating records, as well as attaching and retrieving receipts — behind a secure, stateless authentication layer.
+Users can register, log in, and securely manage their personal expenses — including creating, updating, searching, filtering, paginating, and attaching receipts — with full data isolation between users.
 
 ## Features
 
-* User registration and login with secure password handling
-* Stateless JWT-based authentication and authorization
-* Per-user data isolation — every expense is scoped to its owner
-* Full CRUD support for expense records
-* Search expenses by title
-* Category-based filtering
-* Paginated retrieval
-* Receipt upload with file type and size validation
-* Receipt download
-* Centralized exception handling
-* Request validation using Jakarta Bean Validation
-* Interactive API documentation using Swagger/OpenAPI
-* Docker and Docker Compose support
-* Unit and integration tests
+- User registration and login with BCrypt password hashing
+- Stateless JWT-based authentication
+- Per-user data isolation — expense operations are scoped to the authenticated user
+- Full CRUD for expense records
+- Title-based expense search
+- Category-based filtering
+- Paginated expense retrieval
+- Receipt upload with file type and size validation (PDF, JPG, PNG — max 10 MB)
+- Receipt download
+- Centralized exception handling with consistent error responses
+- Request validation using Jakarta Bean Validation
+- Interactive API documentation via Swagger/OpenAPI
+- Docker and Docker Compose support
+- Unit and integration tests with CI via GitHub Actions
 
 ## Tech Stack
 
-| Technology        | Purpose                          |
-| ----------------- | -------------------------------- |
-| Java              | Core language                    |
-| Spring Boot       | REST API framework               |
-| Spring Security   | Authentication and authorization |
-| JWT               | Stateless authentication         |
-| Spring Data JPA   | Data access layer                |
-| Hibernate         | ORM                              |
-| MySQL             | Relational database              |
-| Maven             | Build and dependency management  |
-| Docker            | Containerization                 |
-| Swagger / OpenAPI | API documentation                |
-| JUnit             | Testing                          |
+| Technology         | Purpose                           |
+|--------------------|-----------------------------------|
+| Java 21            | Core language                     |
+| Spring Boot 3      | REST API framework                |
+| Spring Security    | Authentication and authorization  |
+| JWT (jjwt 0.11.5)  | Stateless token authentication    |
+| Spring Data JPA    | Data access layer                 |
+| Hibernate          | ORM                               |
+| PostgreSQL 16      | Relational database               |
+| H2 (test scope)    | In-memory DB for integration tests|
+| Maven              | Build and dependency management   |
+| Docker             | Containerization                  |
+| Swagger / OpenAPI  | Interactive API documentation     |
+| JUnit 5 / Mockito  | Unit and integration testing      |
+| GitHub Actions     | CI pipeline                       |
+| Spring Mail        | Welcome email on registration     |
+| Spring Actuator    | Health endpoint                   |
 
 ## Architecture
 
-The application follows a layered architecture:
+The application follows a standard layered architecture:
 
-```text
-Client
-  |
-  v
-REST Controllers
-  |
-  v
-Service Layer
-  |
-  v
-Repository Layer
-  |
-  v
-MySQL Database
 ```
-
-Protected requests pass through JWT authentication:
-
-```text
 Client
-  |
-  | Authorization: Bearer <JWT>
-  v
+  │
+  ▼
 JWT Authentication Filter
-  |
-  v
+  │  (validates Bearer token, populates SecurityContext)
+  ▼
 Spring Security
-  |
-  v
-Controller
-  |
-  v
-Service
-  |
-  v
-Repository
-  |
-  v
-Database
+  │
+  ▼
+REST Controllers  (/auth, /expenses)
+  │
+  ▼
+Service Layer
+  │
+  ▼
+Repository Layer  (Spring Data JPA)
+  │
+  ▼
+PostgreSQL Database
 ```
 
 ## Project Structure
 
-```text
+```
 src/
 ├── main/
-│   ├── java/
-│   │   └── com/project1/ExpenseTracker/
-│   │       ├── config/
-│   │       ├── controller/
-│   │       ├── dto/
-│   │       ├── entity/
-│   │       ├── exception/
-│   │       ├── repository/
-│   │       ├── security/
-│   │       └── service/
-│   │
+│   ├── java/com/project1/ExpenseTracker/
+│   │   ├── config/          # SecurityConfig, OpenApiConfig
+│   │   ├── controller/      # AuthController, ExpenseController
+│   │   ├── dto/             # Request and response DTOs
+│   │   ├── entity/          # User, Expense JPA entities
+│   │   ├── exception/       # GlobalExceptionHandler, custom exceptions
+│   │   ├── repository/      # UserRepository, ExpenseRepository
+│   │   ├── security/        # JwtService, JwtAuthenticationFilter, CustomUserDetailsService
+│   │   └── service/         # AuthService, ExpenseService, EmailService, FileStorageService
 │   └── resources/
 │       └── application.properties
-│
 └── test/
-    └── java/
-        └── com/project1/ExpenseTracker/
+    ├── java/com/project1/ExpenseTracker/
+    │   ├── ExpenseServiceTest.java         # Unit tests (Mockito)
+    │   └── ExpenseTrackerApplicationTests.java  # Spring context integration test
+    └── resources/
+        └── application.properties         # H2 in-memory config for tests
 ```
 
 ## API Endpoints
 
 ### Authentication
 
-| Method | Endpoint         | Description                    |
-| ------ | ---------------- | ------------------------------ |
-| POST   | `/auth/register` | Register a new user            |
-| POST   | `/auth/login`    | Authenticate and receive a JWT |
+| Method | Endpoint         | Description                          |
+|--------|------------------|--------------------------------------|
+| POST   | `/auth/register` | Register a new user                  |
+| POST   | `/auth/login`    | Authenticate and receive a JWT token |
 
-### Expenses
+### Expenses (require `Authorization: Bearer <token>`)
 
-| Method | Endpoint                           | Description                                      |
-| ------ | ---------------------------------- | ------------------------------------------------ |
-| POST   | `/expenses`                        | Create a new expense                             |
-| GET    | `/expenses`                        | Retrieve all expenses for the authenticated user |
-| GET    | `/expenses/{id}`                   | Retrieve a single expense                        |
-| PUT    | `/expenses/{id}`                   | Update an existing expense                       |
-| DELETE | `/expenses/{id}`                   | Delete an expense                                |
-| GET    | `/expenses/search?title=Food`      | Search expenses by title                         |
-| GET    | `/expenses/category?category=Food` | Filter expenses by category                      |
-| GET    | `/expenses/page?page=0&size=10`    | Retrieve paginated expenses                      |
-| POST   | `/expenses/{id}/receipt`           | Upload a receipt                                 |
-| GET    | `/expenses/{id}/receipt`           | Download a receipt                               |
+| Method | Endpoint                              | Description                              |
+|--------|---------------------------------------|------------------------------------------|
+| POST   | `/expenses`                           | Create a new expense                     |
+| GET    | `/expenses`                           | Get all expenses for the logged-in user  |
+| GET    | `/expenses/{id}`                      | Get a single expense by ID               |
+| PUT    | `/expenses/{id}`                      | Update an expense                        |
+| DELETE | `/expenses/{id}`                      | Delete an expense                        |
+| GET    | `/expenses/search?title=Food`         | Search expenses by title                 |
+| GET    | `/expenses/category?category=Food`    | Filter expenses by category              |
+| GET    | `/expenses/page?page=0&size=10`       | Get paginated expenses                   |
+| POST   | `/expenses/{id}/receipt`              | Upload a receipt for an expense          |
+| GET    | `/expenses/{id}/receipt`              | Download a receipt                       |
 
 ## Authentication
 
-The API is secured using JWT Bearer tokens. Once a user logs in, the returned token must be included on subsequent requests to protected endpoints:
+The API uses stateless JWT Bearer authentication.
 
-```text
+1. **Register** — `POST /auth/register`
+2. **Login** — `POST /auth/login` → receive a JWT token
+3. **Use the token** — include it on all expense requests:
+
+```
 Authorization: Bearer <JWT_TOKEN>
 ```
 
-All expense endpoints require a valid token and are scoped to the requesting user.
+Tokens expire after 24 hours. Each expense endpoint is scoped to the authenticated user.
 
-## Validation
+## Validation & Error Handling
 
-Expense requests are validated using Jakarta Bean Validation:
+Requests are validated using Jakarta Bean Validation:
 
-* Title must not be blank
-* Amount is required and must be greater than zero
-* Category must not be blank
-* Date is required
+- Expense title, category, date — required
+- Amount — required, must be positive
 
-Invalid requests return a `400 Bad Request`.
+Invalid requests return `400 Bad Request`.
 
-## Exception Handling
-
-A global exception handler provides consistent error responses for:
-
-* Resource not found
-* Duplicate resources
-* Validation failures
-* Invalid arguments
-* File upload size violations
-* Unexpected server errors
-
-Example:
+All errors follow a consistent JSON format:
 
 ```json
 {
-  "timestamp": "2026-09-11T12:00:00",
+  "timestamp": "2026-09-12T10:00:00",
   "status": 404,
   "error": "Not Found",
-  "message": "Expense not found",
-  "path": "/expenses/1"
+  "message": "Expense not found with id: 42",
+  "path": "/expenses/42"
 }
 ```
 
-## Receipt Management
+## Receipt / File Handling
 
-Receipts can be attached to and retrieved from individual expenses.
+Receipts can be attached to individual expenses.
 
-**Supported file types:**
+| Property          | Value                  |
+|-------------------|------------------------|
+| Supported formats | PDF, JPG, JPEG, PNG    |
+| Maximum size      | 10 MB                  |
+| Storage           | Local filesystem       |
 
-```text
-PDF, JPG, JPEG, PNG
-```
-
-**Maximum file size:**
-
-```text
-10 MB
-```
-
-Uploaded files are assigned unique filenames and validated before storage.
+Files are assigned unique names and validated for type and size before storage. File paths are normalized to prevent path traversal.
 
 ## API Documentation
 
-Once the application is running, Swagger documentation is available at:
+Once the application is running, interactive Swagger documentation is available at:
 
-```text
+```
 http://localhost:8080/swagger-ui/index.html
 ```
+
+## Screenshots
+
+API documentation screenshots are in [`docs/screenshots/`](docs/screenshots/).
+
+> To add screenshots: start the application, open the Swagger UI, and save screenshots to `docs/screenshots/`.
 
 ## Getting Started
 
 ### Prerequisites
 
-* Java (JDK 17+ recommended)
-* Maven
-* MySQL
-* Docker (optional)
+- Java 21 (JDK)
+- Maven (or use the included `mvnw` / `mvnw.cmd` wrapper)
+- PostgreSQL 16
+- Docker (optional, for containerized setup)
 
-### Clone the repository
+### Clone
 
 ```bash
 git clone https://github.com/akshitap30/ExpenseTracker.git
 cd ExpenseTracker
 ```
 
-### Configure the database
+### Configure environment
 
-Create a MySQL database and configure the connection properties. Keep credentials and secrets out of version control.
+Create a `.env` file in the project root (this file is not committed):
+
+```env
+# PostgreSQL
+POSTGRES_DB=expense_tracker
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_password
+
+# Application datasource
+DB_URL=jdbc:postgresql://localhost:5432/expense_tracker
+DB_USERNAME=postgres
+DB_PASSWORD=your_password
+
+# JWT
+JWT_SECRET=your-secret-key-at-least-32-characters-long
+
+# Email (Mailtrap or similar)
+MAIL_USERNAME=your_mail_username
+MAIL_PASSWORD=your_mail_password
+
+# File uploads
+UPLOAD_DIR=uploads
+```
+
+### Create the PostgreSQL database
+
+```sql
+CREATE DATABASE expense_tracker;
+```
 
 ### Run with Maven
-
-Linux/macOS:
-
-```bash
-./mvnw spring-boot:run
-```
 
 Windows:
 
 ```powershell
+$env:DB_URL="jdbc:postgresql://localhost:5432/expense_tracker"
+$env:DB_USERNAME="postgres"
+$env:DB_PASSWORD="your_password"
+$env:JWT_SECRET="your-secret-key-at-least-32-characters-long"
+$env:MAIL_USERNAME="your_mail_username"
+$env:MAIL_PASSWORD="your_mail_password"
+$env:UPLOAD_DIR="uploads"
 .\mvnw.cmd spring-boot:run
 ```
 
-The application starts on:
+Linux/macOS:
 
-```text
-http://localhost:8080
+```bash
+export DB_URL=jdbc:postgresql://localhost:5432/expense_tracker
+export DB_USERNAME=postgres
+export DB_PASSWORD=your_password
+export JWT_SECRET=your-secret-key-at-least-32-characters-long
+export MAIL_USERNAME=your_mail_username
+export MAIL_PASSWORD=your_mail_password
+export UPLOAD_DIR=uploads
+./mvnw spring-boot:run
 ```
 
-### Run with Docker
+Application starts on `http://localhost:8080`.
+
+### Run with Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
+This starts both PostgreSQL and the application together. Environment variables are read from `.env`.
+
 ## Testing
 
-Linux/macOS:
-
-```bash
-./mvnw test
-```
+Tests use H2 in-memory database — no PostgreSQL instance required.
 
 Windows:
 
@@ -260,34 +274,56 @@ Windows:
 .\mvnw.cmd test
 ```
 
+Linux/macOS:
+
+```bash
+./mvnw test
+```
+
+Expected output:
+
+```
+Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+```
+
+Tests are also run automatically on every push and pull request via GitHub Actions.
+
+## CI
+
+This project uses GitHub Actions for continuous integration.
+
+The CI pipeline:
+
+1. Checks out the repository
+2. Sets up Java 21 (Eclipse Temurin)
+3. Starts a PostgreSQL 16 service container
+4. Runs the full Maven test suite
+
+[![Java CI](https://github.com/akshitap30/ExpenseTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/akshitap30/ExpenseTracker/actions/workflows/ci.yml)
+
 ## Security
 
-* Passwords are hashed and never stored in plain text
-* JWT secrets and database credentials are kept out of the repository
-* Protected expense endpoints require authentication
-* Expense data is scoped to the authenticated user
-* Uploaded files are validated for size and content type
-* File paths are normalized to mitigate path traversal risks
+- Passwords are hashed with BCrypt and never stored in plain text
+- JWT secrets and database credentials are provided through environment variables and are not committed to version control
+- All expense endpoints require a valid JWT and return only the authenticated user's data
+- Uploaded files are validated for type and size
+- File paths are normalized to mitigate path traversal risks
 
 ## Roadmap
 
-* Expense summary and analytics dashboard
-* Monthly spending reports
-* Budget management and alerts
-* Category-wise spending charts
-* Advanced date-range filtering
-* Sorting support
-* Refresh token mechanism
-* Role-based authorization
-* Cloud-based receipt storage
-* CI/CD pipeline
-* Production deployment
+- Monthly spending reports and analytics
+- Advanced date-range filtering and sorting
+- Refresh token support
+- Role-based authorization
+- Cloud-based receipt storage (e.g., S3)
+- Budget management and alerts
 
-## Status
+## License
 
-Actively developed and maintained.
+This project is licensed under the [MIT License](LICENSE).
 
 ## Author
 
-**Akshita Pardeshi**
+**Akshita Pardeshi**  
 [GitHub](https://github.com/akshitap30)

@@ -8,21 +8,44 @@ on:
 
 jobs:
   test:
-
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: expense_tracker_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
 
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
       - name: Run tests
-        run: |
-          chmod +x mvnw
-          ./mvnw test
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/expense_tracker_test
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
+          JWT_SECRET: ci-test-secret-key-at-least-32-bytes-long
+          MAIL_USERNAME: test
+          MAIL_PASSWORD: test
+          UPLOAD_DIR: /tmp/uploads
+        run: ./mvnw test
